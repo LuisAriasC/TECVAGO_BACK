@@ -12,6 +12,7 @@ var TravellSchema = Schema({
   finalDate: Number,
   totalPrice: Number,
   rating: Number,
+  /*
   activities: [{
       activity: {
           type: Schema.ObjectId,
@@ -19,6 +20,7 @@ var TravellSchema = Schema({
       },
       date: Date
   }],
+  */
   client: {
     type: Schema.ObjectId,
     ref: 'Client'

@@ -1,5 +1,6 @@
 'use strict'
 var Travell = require('../models/travell');
+var TravellActivity = require('../models/travellActivity');
 
 var travellCotroller = {};
 
@@ -18,14 +19,14 @@ travellCotroller.create = (req, res) => {
     instance.finalDate = params.finalDate;
     instance.totalPrice = params.totalPrice;
     instance.rating = params.rating;
-    instance.activities = params.activities;
+    //instance.activities = params.activities;
     instance.client = req.user.sub;
 
     if (instance.destination != null &&
         instance.initialDate != null &&
         instance.finalDate != null &&
         instance.totalPrice != null &&
-        instance.activities != null &&
+        //instance.activities != null &&
         instance.client != null) 
     {
         instance.save((err, instanceStored) => {
@@ -37,7 +38,22 @@ travellCotroller.create = (req, res) => {
             res.status(404).send({message: 'NO SE HA REGISTRADO LA VIAJE'});
           }
           else {
-            res.status(200).send(instanceStored);
+            params.activities.forEach(element => {
+              var activity = new TravellActivity();
+              activity.travell = instanceStored._id;
+              activity.activity = element.activity;
+              activity.date = element.date;
+              activity.save((err, activityStored) => {
+                if(err) {
+                  res.status(500).send({message: 'ERROR AL GUARDAR VIAJE'});
+                } else {
+                  if(!activityStored) {
+                    res.status(404).send({message: 'NO SE HA REGISTRADO LA VIAJE'});
+                  }
+                }
+              });
+            });
+            res.status(200).send({message: 'Viaje contratado exitosamente'});
           }
         }
       });
@@ -103,19 +119,63 @@ travellCotroller.readAll = (req, res) => {
 
 travellCotroller.readAllByUser = (req, res) => {
     var uId = req.user.sub;
-    Travell.find({client: uId}).sort('name').exec((err, instances) => {
+    Travell.find({client: uId})
+           .sort('name')
+           .populate('destination')
+           .exec((err, instances) => {
       if (err) {
         res.status(500).send({message: 'ERROR EN LA PETICION'});
       }
       else {
         if (instances) {
-          res.status(200).send(instances);
+          const travels = [];
+          instances.forEach(item => {
+            let travel = {};
+            travel._id = item._id;
+            travel.name = item.destination.name;
+            travel.type = item.destination.type;
+
+            var d1 = new Date(0);
+            var d2 = new Date(0);
+            d1.setUTCSeconds(item.initialDate);
+            var date = d1.getDate();
+            var month = d1.getMonth() + 1; // Since getMonth() returns month from 0-11 not 1-12
+            var year = d1.getFullYear();
+            var date1Str = date + "/" + month + "/" + year;
+            d2.setUTCSeconds(item.finalDate);
+            date = d2.getDate();
+            var month = d2.getMonth() + 1; // Since getMonth() returns month from 0-11 not 1-12
+            var year = d2.getFullYear();
+            var date2Str = date + "/" + month + "/" + year;
+            
+            let dates = `${date1Str} - ${date2Str}`;
+            travel.dates =  dates;
+            travel.price = item.totalPrice;
+            travel.rating = item.rating;
+            travels.push(travel);
+          });
+          res.status(200).send(travels);
         }
         else {
           res.status(404).send({message: 'NO HAY VIAJEs'});
         }
       }
     });
+}
+
+travellCotroller.readAllActivities = (req, res) => {
+  var travellId = req.params.id;
+  TravellActivity.find({travell: travellId}).select('-travell -activity.days').populate('activity').exec((err, activities) => {
+    if(err) {
+      res.status(500).send({message: 'ERROR EN LA PETICION'});
+    } else {
+      if(!activities){
+        res.status(404).send({message: 'EL VIAJE NO EXISTE'});
+      } else {
+        res.status(200).send(activities);
+      }
+    }
+  });
 }
 
 

@@ -4,6 +4,8 @@ var fs = require('fs');
 var path = require('path');
 var bcrypt = require('bcrypt-nodejs');
 var Client = require('../models/client');
+var Travell = require('../models/travell');
+
 
 //CRUD
 var jwt = require('../services/jwt');
@@ -62,7 +64,18 @@ clientController.createClient = (req, res) => {
                 res.status(404).send({message: 'NO SE HA REGISTRADO EL CLIENTE'});
               }
               else {
-                res.status(200).send({message: 'USUARIO CREADO CORRECTAMENTE'});
+                //Devolver los datos del cliente logeado
+                const token = jwt.createToken(clientStored)
+                var nemployee = {};
+                nemployee.name = clientStored.name;
+                nemployee.surname = clientStored.surname;
+                nemployee.username = clientStored.username;
+                //devolver token de jwt
+                res.status(200).send({
+                  client: nemployee,
+                  token
+                });
+                //res.status(200).send({message: 'USUARIO CREADO CORRECTAMENTE'});
               }
             }
           });
@@ -98,7 +111,8 @@ in the request body send the next atributes
 */
 clientController.loginClient = (req, res) => {
 
-  console.log('LOGIN CLIENT REQUEST');
+  console.log('LOGIN CLIENT REQUEST ---');
+  console.log(req.body);
   var params = req.body;
   var email = params.email;
   var password = params.password;
@@ -109,6 +123,7 @@ clientController.loginClient = (req, res) => {
 
     } else {
       if (!client) {
+        console.log('doesnt exists');
         res.status(404).send({message: 'EL CLIENTE NO EXISTE'});
 
       } else {
@@ -168,6 +183,7 @@ clientController.readClient = (req, res) => {
 }
 
 clientController.read = (req, res) => {
+  console.log('GET USER ,', req.user.sub);
   var clientId = req.user.sub;
 
   Client.findById(clientId, (err, client) => {
@@ -177,7 +193,14 @@ clientController.read = (req, res) => {
       if (!client) {
         res.status(404).send({message: 'EL CLIENTE NO EXISTE'});
       } else {
-        res.status(200).send(client);
+        Travell.count({client: clientId}, function( err, count){
+          if (err) {
+            res.status(500).send({message: 'ERROR EN LA PETICION'});
+          } else {
+            console.log(client);
+            res.status(200).send({client, travells: count});
+          }
+        });
       }
     }
   });
@@ -252,7 +275,13 @@ clientController.updateClient = (req, res) => {
               res.status(404).send({message: 'EL CLIENTE NO EXISTE'});
             }
             else {
-              res.status(200).send(upClient);
+              Travell.count({client: clientId}, function( err, count){
+                if (err) {
+                  res.status(500).send({message: 'ERROR EN LA PETICION'});
+                } else {
+                  res.status(200).send({client: upClient, travells: count});
+                }
+              });
             }
           }
         });
@@ -263,7 +292,6 @@ clientController.updateClient = (req, res) => {
 
 
 clientController.update = (req, res) => {
-  console.log(1);
   var clientId = req.user.sub;
   var update = req.body;
 
